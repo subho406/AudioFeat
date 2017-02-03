@@ -1,2 +1,2 @@
 # AI-DJ
-A Music Recommendation Engine based on Mood Classification
+A Music Recommendation Engine based on your mood
