@@ -1,2 +1,3 @@
-# AI-DJ
-A Music Recommendation Engine based on your mood
+# Vibes
+
+A user-preferential mood based classification Engine.
