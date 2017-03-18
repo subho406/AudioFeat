@@ -68,7 +68,7 @@ def process_audios(filelist,n_jobs,progress=False):
 	final_df=p.map(generate_audio_features,filelist)
 
 	if(progress):
-		print('\t\t------- Completed processing all Audios -------')
+		print('\nCompleted processing all Audios.')
 
 	return final_df
 
