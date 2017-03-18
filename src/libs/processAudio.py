@@ -11,23 +11,79 @@ Requires:
 """
 
 
+from multiprocessing import Pool
+
+
 __version__ = '0.1'
 __author__ = 'Subhojeet Pramanik'
 
 
+import os
 import librosa
 import numpy as np
 import pandas as pd
 import scipy
+import time
 
-def process_audios(filelist):
+
+exts=['.mp3','.wav']
+show_progress=False
+
+
+def process_audios(filelist,n_jobs,progress=False):
 	'''Generates content based features for 
 		a given number of audio file
 
 		Arguments:
-			filelist	- 	Tuple containing the list of
+			filelist	- 	Tuple containing the list of audio file paths
+			n_jobs		-	Number of jobs to run in parallel
+
+		Returns:	pandas.DataFrame
 
 	'''
+
+	#Change global Progress variable
+	global show_progress
+	show_progress=progress
+
+	# Create the Temp file for keep track of the process count
+	with open('/tmp/processAudioProgess.tmp','w') as f:
+		f.write('-1\n'+str(len(filelist)))
+		f.close()
+	
+	# Create pool for n jobs ''
+	p=Pool(n_jobs)
+
+	# Check list of arguments before processing
+	for f in filelist:
+		filename, file_extension = os.path.splitext(f)
+		if(file_extension not in exts):
+			raise ValueError('Invalid arguments specified. Some of the path do not point to a valid audio file.')
+
+
+	# Process the arguments in parallel
+	if(progress):
+		display_progress()
+
+	final_df=p.map(generate_audio_features,filelist)
+
+	if(progress):
+		print('\t\t------- Completed processing all Audios -------')
+
+	return final_df
+
+
+def display_progress():
+	with open('/tmp/processAudioProgess.tmp','r') as f:
+		count=int(f.readline())
+		total=int(f.readline())
+		count=count+1
+		prct=(count/total)*100
+		print('\n\t\t------- Completed '+str(round(prct,2))+'% -------\n')
+	with open('/tmp/processAudioProgess.tmp','w') as f:
+		f.write(str(count)+'\n'+str(total))
+		f.close()
+
 def generate_audio_features(path):
 	'''Generates content based features for 
 		a given Audio file
@@ -43,10 +99,13 @@ def generate_audio_features(path):
 	y,sr=librosa.load(audio)	#Load the audio from the path
 	
 	## Audio Overview
-	print('Audio Sampling Rate: '+str(sr)+' samples/sec')
-	print('Total Samples: '+str(np.size(y)))
-	secs=np.size(y)/sr
-	print('Audio Length: '+str(secs)+' s')
+
+	if(show_progress):
+		print('Audio File: '+path)
+		print('Audio Sampling Rate: '+str(sr)+' samples/sec')
+		print('Total Samples: '+str(np.size(y)))
+		secs=np.size(y)/sr
+		print('Audio Length: '+str(secs)+' s')
 
 
 	###	Seperation of Harmonic and Percussive Signals
@@ -55,7 +114,6 @@ def generate_audio_features(path):
 
 	###	1. Beat Extraction 
 	tempo, beat_frames = librosa.beat.beat_track(y=y_harmonic, sr=sr)
-	print('Detected Tempo: '+str(tempo)+ ' beats/min')	#Print the detected Tempo
 	beat_times = librosa.frames_to_time(beat_frames, sr=sr)
 	beat_time_diff=np.ediff1d(beat_times)
 	beat_nums = np.arange(1, np.size(beat_times))
@@ -136,6 +194,8 @@ def generate_audio_features(path):
 	for i in range(0,7):
 	    collist.append('contrast_std_'+str(i))
 	collist=collist+['rolloff_mean','rolloff_std','rolloff_skew']
+	
+	spectral_df=pd.DataFrame()
 	for c in collist:
 	    spectral_df[c]=0
 	data=np.concatenate(([cent_mean,cent_std,cent_skew],
@@ -143,7 +203,6 @@ def generate_audio_features(path):
 						[rolloff_mean,rolloff_std,rolloff_std]),
 						axis=0)
 	spectral_df.loc[0]=data
-	spectral_df
 
 
 	### 4. Zero Crossing Rate
@@ -168,6 +227,11 @@ def generate_audio_features(path):
 	final_df=pd.concat((chroma_df,mfccs_df,
 						spectral_df,zrate_df,
 						beat_df),axis=1)
+
+
+	## Display the final progress
+	if(show_progress):
+		display_progress()
 
 	return final_df
 
