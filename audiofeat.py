@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 '''extractFeatures.py
 	
 Script for generating audio features given 
